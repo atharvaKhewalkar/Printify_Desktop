@@ -1,47 +1,109 @@
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Progress } from "@/components/ui/progress"
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
-import { Pause, Square, Check, Printer, Activity, Clock, Zap, CheckCircle } from "lucide-react"
+import { Pause, Square, Check, Printer, Activity, Clock, Zap, CheckCircle, AlertCircle, Play } from "lucide-react"
+import apiService from "@/services/api"
 
-const mockQueueJobs = [
-  { id: 1, customerName: "Alice Brown", status: "Printing", targetPrinter: "HP LaserJet Pro 1", eta: "5 min", progress: 65, jobType: "Color Brochures" },
-  { id: 2, customerName: "Bob Chen", status: "Queued", targetPrinter: "Canon ImageClass 2", eta: "12 min", progress: 0, jobType: "B/W Documents" },
-  { id: 3, customerName: "Carol White", status: "Printing", targetPrinter: "Epson EcoTank 1", eta: "8 min", progress: 30, jobType: "Photo Prints" },
-  { id: 4, customerName: "David Lee", status: "Paused", targetPrinter: "HP LaserJet Pro 1", eta: "On Hold", progress: 45, jobType: "Business Cards" },
-  { id: 5, customerName: "Eva Martinez", status: "Ready", targetPrinter: "Canon ImageClass 2", eta: "Completed", progress: 100, jobType: "Flyers" },
-  { id: 6, customerName: "Frank Wilson", status: "Printing", targetPrinter: "HP LaserJet Pro 2", eta: "3 min", progress: 80, jobType: "Reports" },
-  { id: 7, customerName: "Grace Taylor", status: "Queued", targetPrinter: "Epson EcoTank 2", eta: "15 min", progress: 0, jobType: "Posters" },
-  { id: 8, customerName: "Henry Rodriguez", status: "Printing", targetPrinter: "Canon ImageClass 1", eta: "6 min", progress: 25, jobType: "Invoices" },
-  { id: 9, customerName: "Isabel Garcia", status: "Ready", targetPrinter: "HP LaserJet Pro 1", eta: "Completed", progress: 100, jobType: "Certificates" },
-  { id: 10, customerName: "Jack Thompson", status: "Queued", targetPrinter: "Epson EcoTank 1", eta: "20 min", progress: 0, jobType: "Banners" },
-  { id: 11, customerName: "Kate Anderson", status: "Printing", targetPrinter: "Canon ImageClass 2", eta: "4 min", progress: 70, jobType: "Proposals" },
-  { id: 12, customerName: "Luis Martinez", status: "Paused", targetPrinter: "HP LaserJet Pro 2", eta: "On Hold", progress: 60, jobType: "Presentations" },
-  { id: 13, customerName: "Maya Johnson", status: "Ready", targetPrinter: "Epson EcoTank 2", eta: "Completed", progress: 100, jobType: "Marketing Materials" },
-  { id: 14, customerName: "Nathan Davis", status: "Printing", targetPrinter: "Canon ImageClass 1", eta: "7 min", progress: 40, jobType: "Legal Documents" },
-  { id: 15, customerName: "Olivia Brown", status: "Queued", targetPrinter: "HP LaserJet Pro 1", eta: "18 min", progress: 0, jobType: "Training Manuals" },
-  { id: 16, customerName: "Paul Wilson", status: "Printing", targetPrinter: "Epson EcoTank 1", eta: "2 min", progress: 90, jobType: "Contracts" },
-  { id: 17, customerName: "Quinn Lee", status: "Ready", targetPrinter: "Canon ImageClass 2", eta: "Completed", progress: 100, jobType: "Newsletters" },
-  { id: 18, customerName: "Rachel Miller", status: "Queued", targetPrinter: "HP LaserJet Pro 2", eta: "25 min", progress: 0, jobType: "Event Programs" },
-  { id: 19, customerName: "Samuel Clark", status: "Printing", targetPrinter: "Epson EcoTank 2", eta: "9 min", progress: 15, jobType: "Technical Specs" },
-  { id: 20, customerName: "Tina Rodriguez", status: "Paused", targetPrinter: "Canon ImageClass 1", eta: "On Hold", progress: 35, jobType: "Product Catalogs" },
-  { id: 21, customerName: "Victor Martinez", status: "Ready", targetPrinter: "HP LaserJet Pro 1", eta: "Completed", progress: 100, jobType: "Safety Manuals" },
-  { id: 22, customerName: "Wendy Thompson", status: "Queued", targetPrinter: "Epson EcoTank 1", eta: "30 min", progress: 0, jobType: "Annual Reports" },
-  { id: 23, customerName: "Xavier Davis", status: "Printing", targetPrinter: "Canon ImageClass 2", eta: "1 min", progress: 95, jobType: "Quick Reference" },
-  { id: 24, customerName: "Yara Johnson", status: "Ready", targetPrinter: "HP LaserJet Pro 2", eta: "Completed", progress: 100, jobType: "User Guides" }
-]
+// --- Type Definition for an Order from the Database ---
+interface Order {
+  id: number;
+  order_id: string;
+  name: string;
+  copies: number;
+  paper_size: string;
+  print_side: string;
+  color: string;
+  total: string;
+  status: 'pending' | 'processing' | 'printing' | 'ready' | 'completed' | 'paused'; // Added paused
+  created_at: string;
+}
+
+// --- Helper to get status styles ---
+const getStatusBadge = (status: Order['status']) => {
+  switch (status) {
+    case "processing":
+      return <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">Queued</Badge>;
+    case "printing":
+      return <Badge className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0">Printing</Badge>;
+    case "ready":
+      return <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0">Ready</Badge>;
+    case "paused":
+      return <Badge className="bg-gradient-to-r from-red-500 to-pink-500 text-white border-0">Paused</Badge>;
+    default:
+      return <Badge variant="outline">{status}</Badge>;
+  }
+};
+
 
 export function PrintQueue() {
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 5
-  const totalPages = Math.ceil(mockQueueJobs.length / itemsPerPage)
+  const [queueJobs, setQueueJobs] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const currentJobs = mockQueueJobs.slice(startIndex, endIndex)
+  const itemsPerPage = 5;
+
+  const fetchQueueJobs = async () => {
+    try {
+      const allJobs = await apiService.getJobs();
+      // Filter for jobs that are in the production queue
+      const inQueue = allJobs.filter((job: Order) => 
+        job.status === 'processing' || 
+        job.status === 'printing' || 
+        job.status === 'paused' || 
+        job.status === 'ready'
+      );
+      setQueueJobs(inQueue);
+      setError(null);
+    } catch (err) {
+      setError('Could not connect to the backend. Please ensure it is running.');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQueueJobs(); // Initial fetch
+    const interval = setInterval(fetchQueueJobs, 5000); // Poll for updates every 5 seconds
+    return () => clearInterval(interval); // Cleanup
+  }, []);
+
+  const handleUpdateStatus = async (orderId: string, status: Order['status']) => {
+    try {
+      await apiService.updateJobStatus(orderId, status);
+      fetchQueueJobs(); // Refresh the list to show the change
+    } catch (err) {
+      console.error(`Failed to update job ${orderId} to ${status}:`, err);
+      alert("Could not update job status.");
+    }
+  };
+
+  const totalPages = Math.ceil(queueJobs.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentJobs = queueJobs.slice(startIndex, endIndex);
+
+  // --- Calculated Stats ---
+  const printingCount = queueJobs.filter(job => job.status === "printing").length;
+  const readyCount = queueJobs.filter(job => job.status === "ready").length;
+
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-screen">Loading print queue...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-screen text-red-500 p-4 text-center">
+        <AlertCircle className="mr-2" /> {error}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -62,7 +124,7 @@ export function PrintQueue() {
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total in Queue</p>
-                <div className="text-2xl font-bold">{mockQueueJobs.length}</div>
+                <div className="text-2xl font-bold">{queueJobs.length}</div>
               </div>
             </div>
           </CardContent>
@@ -76,9 +138,7 @@ export function PrintQueue() {
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Currently Printing</p>
-                <div className="text-2xl font-bold text-success">
-                  {mockQueueJobs.filter(job => job.status === "Printing").length}
-                </div>
+                <div className="text-2xl font-bold text-success">{printingCount}</div>
               </div>
             </div>
           </CardContent>
@@ -92,9 +152,7 @@ export function PrintQueue() {
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Ready for Pickup</p>
-                <div className="text-2xl font-bold text-accent-foreground">
-                  {mockQueueJobs.filter(job => job.status === "Ready").length}
-                </div>
+                <div className="text-2xl font-bold text-accent-foreground">{readyCount}</div>
               </div>
             </div>
           </CardContent>
@@ -133,58 +191,48 @@ export function PrintQueue() {
               <TableRow>
                 <TableHead>Customer</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Printer</TableHead>
                 <TableHead>Progress</TableHead>
-                <TableHead>ETA</TableHead>
-                <TableHead>Job Type</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {currentJobs.map((job) => (
                 <TableRow key={job.id} className="hover:bg-gradient-to-r hover:from-green-50 hover:to-blue-50">
-                  <TableCell className="font-medium">{job.customerName}</TableCell>
-                  <TableCell>
-                    <Badge className={
-                      job.status === "Printing" ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0" :
-                      job.status === "Ready" ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0" :
-                      job.status === "Paused" ? "bg-gradient-to-r from-red-500 to-pink-500 text-white border-0" :
-                      "bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0"
-                    }>
-                      {job.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">{job.targetPrinter}</TableCell>
+                  <TableCell className="font-medium">{job.name}</TableCell>
+                  <TableCell>{getStatusBadge(job.status)}</TableCell>
                   <TableCell>
                     <div className="space-y-2">
                       <Progress 
-                        value={job.progress} 
+                        value={job.status === 'ready' || job.status === 'completed' ? 100 : (job.status === 'processing' ? 5 : 50)} 
                         className="w-20 h-2"
                       />
-                      <span className="text-xs text-muted-foreground">{job.progress}%</span>
                     </div>
-                  </TableCell>
-                  <TableCell>{job.eta}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="border-blue-300 text-blue-700 bg-blue-50">
-                      {job.jobType}
-                    </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
-                      {job.status === "Printing" && (
-                        <Button size="sm" variant="ghost" className="hover:bg-yellow-100 hover:text-yellow-700">
+                      {job.status === "printing" && (
+                        <Button size="sm" variant="ghost" className="hover:bg-yellow-100 hover:text-yellow-700" onClick={() => handleUpdateStatus(job.order_id, 'paused')}>
                           <Pause className="w-4 h-4" />
                         </Button>
                       )}
-                      {job.status !== "Ready" && (
-                        <Button size="sm" variant="ghost" className="hover:bg-red-100 hover:text-red-700">
-                          <Square className="w-4 h-4" />
+                      {job.status === "paused" && (
+                        <Button size="sm" variant="ghost" className="hover:bg-blue-100 hover:text-blue-700" onClick={() => handleUpdateStatus(job.order_id, 'printing')}>
+                          <Play className="w-4 h-4" />
                         </Button>
                       )}
-                      {job.status === "Ready" && (
-                        <Button size="sm" variant="ghost" className="hover:bg-green-100 hover:text-green-700">
-                          <Check className="w-4 h-4" />
+                      {job.status === "processing" && (
+                         <Button size="sm" variant="ghost" className="hover:bg-blue-100 hover:text-blue-700" onClick={() => handleUpdateStatus(job.order_id, 'printing')}>
+                          <Play className="w-4 h-4 mr-1" /> Start
+                        </Button>
+                      )}
+                      {job.status === "printing" && (
+                         <Button size="sm" variant="ghost" className="hover:bg-green-100 hover:text-green-700" onClick={() => handleUpdateStatus(job.order_id, 'ready')}>
+                          <Check className="w-4 h-4 mr-1" /> Finish
+                        </Button>
+                      )}
+                       {job.status === "ready" && (
+                         <Button size="sm" variant="ghost" className="hover:bg-green-100 hover:text-green-700" onClick={() => handleUpdateStatus(job.order_id, 'completed')}>
+                          <CheckCircle className="w-4 h-4 mr-1" /> Complete
                         </Button>
                       )}
                     </div>
